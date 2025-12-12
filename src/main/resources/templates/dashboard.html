@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="it" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>La Verde Collina - Dashboard</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; }
+        .container { max-width: 1200px; margin: auto; }
+        h1 { color: #2e8b57; }
+        .campo-card {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            background-color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .campo-card:hover { background-color: #e9ffe9; }
+        .attivo { border-left: 5px solid green; }
+        .riposo { border-left: 5px solid gray; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+        .dettaglio-sezione { margin-top: 40px; border-top: 2px solid #2e8b57; padding-top: 20px; }
+        #grafico-contenitore {
+        max-height: 250px;
+        display: flex;
+        overflow: hidden;
+        margin-top: 15px;
+    }
+    #tempUmiditaChart {
+        width: 100% !important;
+    }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🌳 La Verde Collina</h1>
+
+    <h2>Panoramica Campi</h2>
+    <div class="stats-grid">
+        <div th:each="campo, iterStat : ${data.campi}"
+             th:class="|campo-card ${campo.stato.name().toLowerCase()}|"
+             th:data-campo-id="${iterStat.index + 1}"
+             onclick="fetchAndRenderDetails(this)">
+
+            <h3 th:text="${campo.nomeCampo}">Nome Campo</h3>
+
+            <p><strong>Stato:</strong> <span th:text="${campo.stato.name()}">ATTIVO</span></p>
+
+            <p><strong>Temp. Aria:</strong>
+                <span th:if="${campo.temperaturaAriaRecente != null}"
+                      th:text="${#numbers.formatDecimal(campo.temperaturaAriaRecente, 1, 2)} + ' °C'">25.50 °C</span>
+                <span th:unless="${campo.temperaturaAriaRecente != null}">N/A</span>
+            </p>
+
+            <hr style="border-top: 1px dashed #ccc; margin: 10px 0;">
+
+            <p><strong>Produzione:</strong>
+                <span th:text="${#numbers.formatDecimal(campo.produzioneKg, 1, 1)} + ' Kg'">120.5 Kg</span>
+            </p>
+
+            <p><strong>Bilancio:</strong>
+                <span th:text="${#numbers.formatDecimal(campo.bilancioEconomico, 1, 2)} + ' €'"
+                      th:style="${campo.bilancioEconomico >= 0} ? 'color: green; font-weight: bold;' : 'color: red; font-weight: bold;'">
+                    + 500.00 €
+                </span>
+            </p>
+        </div>
+    </div>
+
+    <div class="dettaglio-sezione" id="dettaglio-wrapper" style="display: none;">
+        <h2 id="dettaglio-titolo">Dettagli di Monitoraggio: <span id="campo-selezionato"></span></h2>
+        <div id="grafico-contenitore">
+            <canvas id="tempUmiditaChart"></canvas>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<script>
+    let chartInstance = null;
+
+    function fetchAndRenderDetails(element) {
+        // Ottiene l'ID del campo dall'attributo data (Campo 1 ha ID 1, ecc.)
+        const campoId = $(element).data('campo-id');
+        const campoNome = $(element).find('h3').text();
+
+        $('#dettaglio-wrapper').show();
+
+        $('#dettaglio-titolo').text('Dettagli di Monitoraggio: ' + campoNome);
+
+        $.get("/api/dashboard/temp-umidita", { campoId: campoId })
+            .done(function(data) {
+                // La funzione 'data' contiene la mappa { labels: [...], datasets: [...] }
+                renderChart(data);
+            })
+            .fail(function() {
+                $('#dettaglio-titolo').text('Errore nel caricamento dei dati per ' + campoNome);
+                if (chartInstance) {
+                    chartInstance.destroy(); // Distrugge il grafico precedente in caso di errore
+                }
+            });
+    }
+
+    function renderChart(apiData) {
+        const ctx = document.getElementById('tempUmiditaChart').getContext('2d');
+
+        // Se esiste già un grafico, lo distrugge per evitarne la sovrapposizione
+        if (chartInstance) {
+            chartInstance.destroy();
+        }
+
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: apiData.labels, // Etichette temporali (HH:mm)
+                datasets: apiData.datasets // I dati di Temperatura e Umidità
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: 'Valore (°C / %)'
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Andamento Temperatura e Umidità (Ultime 24h)'
+                    }
+                }
+            }
+        });
+    }
+</script>
+</body>
+</html>
