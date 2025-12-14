@@ -58,7 +58,7 @@ Il progetto è sviluppato seguendo un'architettura a livelli (Controller-Service
 
 ## 📷 Anteprima (Screenshot)
 
-*![img.png](img.png)*
+*![img.png](src/main/img.png)*
 
 ---
 **Autore:** Andrea Ginda
